@@ -17,24 +17,21 @@
 /* Microseconds to stall between 16 bit transfers */
 #define STALL_TIME 20
 
+/* Half-words to read from RX during a burst read */
+#define BURST_LEN 10
+
 /* Which event happens when the registers are ready */
 #define IRQ_LEVEL GPIO_IRQ_EDGE_RISE
 
-void stall() {
-    sleep_us(STALL_TIME);
-}
-
-void select() {
+void SPI_Select() {
     gpio_put(PIN_CS, 0);
 }
 
-void deselect() {
+void SPI_Deselect() {
     gpio_put(PIN_CS, 1);
 }
 
 void IMU_SPI_Init() {
-    stdio_init_all();
-
     /* Use SPI at 1MHz on spi0. */
     spi_init(SPI_PORT, 1000*1000);
     gpio_set_function(PIN_RX,   GPIO_FUNC_SPI);
@@ -62,17 +59,49 @@ uint16_t IMU_SPI_Transfer(uint32_t MOSI) {
     uint16_t msg = MOSI;
     uint16_t res = 0;
 
-    gpio_put(PIN_CS, 0);
+    SPI_Select();
     spi_write16_blocking(SPI_PORT, &msg, 1);
-    gpio_put(PIN_CS, 1);
+    SPI_Deselect();
 
     sleep_us(STALL_TIME);
 
-    gpio_put(PIN_CS, 0);
+    SPI_Select();
     spi_read16_blocking(SPI_PORT, 0, &res, 1);
-    gpio_put(PIN_CS, 1);
+    SPI_Deselect();
 
     sleep_us(STALL_TIME);
 
     return res;
+}
+
+uint16_t IMU_Read_Register(uint8_t RegAddr) {
+    /* Write a 0 the R/W pin, then the address */
+    uint16_t msg = (((uint16_t)RegAddr) << 8) & 0x7FFF;
+
+    return IMU_SPI_Transfer(msg);
+}
+
+/* NOTE: each register has 2 bytes that need to be written to */
+uint16_t IMU_Write_Register(uint8_t RegAddr, uint8_t RegValue) {
+    /* Write a 1 to the R/W pin, then the address and new value */
+    uint16_t msg = (0x8000 | (((uint16_t)RegAddr) << 8) | RegValue);
+
+    return IMU_SPI_Transfer(msg);
+}
+
+void IMU_Start_Burst(uint8_t *bufEntry) {
+    /* Sending this value starts a burst read */
+    uint16_t msg = 0x6800;
+
+    SPI_Select();
+    spi_write16_blocking(SPI_PORT, &msg, 1);
+    spi_read16_blocking(SPI_PORT, 0x00, (uint16_t*)bufEntry, BURST_LEN);
+    SPI_Deselect();
+}
+
+void IMU_Reset() {
+  gpio_put(PIN_RST, 0);  // Active low
+  sleep_ms(10);
+  gpio_put(PIN_RST, 1);  // Active low
+  sleep_ms(310);
 }
