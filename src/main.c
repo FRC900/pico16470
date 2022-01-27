@@ -7,7 +7,7 @@
 
 void loop() {
     /* Returns the PROD_ID register */
-    IMU_SPI_Transfer(0x7200);
+    IMU_Read_Register(0x72);
 
     sleep_ms(100);
 }
