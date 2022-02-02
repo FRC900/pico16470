@@ -37,11 +37,11 @@ uint dma_rx;
 dma_channel_config dma_tx_config;
 uint dma_tx;
 
-void SPI_Select() {
+static inline void SPI_Select() {
     gpio_put(PIN_CS, 0);
 }
 
-void SPI_Deselect() {
+static inline void SPI_Deselect() {
     gpio_put(PIN_CS, 1);
 }
 
@@ -77,6 +77,8 @@ void IMU_SPI_Init() {
     dma_tx_config = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_tx_config, DMA_SIZE_16);
     channel_config_set_dreq(&dma_tx_config, spi_get_dreq(SPI_PORT, true));
+    channel_config_set_read_increment(&dma_tx_config, true);
+    channel_config_set_write_increment(&dma_tx_config, false);
 
     // We set the inbound DMA to transfer from the SPI receive FIFO to a memory
     // buffer paced by the SPI RX FIFO DREQ We configure the read address to
@@ -162,8 +164,17 @@ void IMU_Start_Burst(uint16_t *buf) {
 void IMU_Finish_Burst() {
     /* Bring CS high */
     SPI_Deselect();
+
+    /* Clear the interrupt */
+    dma_hw->ints0 = 1u << dma_rx;
+
     /* Turn on LED */
     gpio_put(PIN_LED, 1);
+}
+
+void IMU_Burst_Wait() {
+    dma_channel_wait_for_finish_blocking(dma_rx);
+    dma_channel_wait_for_finish_blocking(dma_tx);
 }
 
 void IMU_Reset() {
