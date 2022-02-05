@@ -28,13 +28,13 @@
 void IMU_DMA_Finish_Burst();
 
 static const uint16_t start_burst_read = 0x6800;
-static const uint16_t imu_write_buf[] = {start_burst_read, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const uint16_t imu_write_buf[BURST_LEN] = {start_burst_read, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-dma_channel_config dma_rx_config;
-uint dma_rx;
+static dma_channel_config dma_rx_config;
+static uint dma_rx;
 
-dma_channel_config dma_tx_config;
-uint dma_tx;
+static dma_channel_config dma_tx_config;
+static uint dma_tx;
 
 static inline void SPI_Select() {
     gpio_put(PIN_CS, 0);
@@ -62,37 +62,36 @@ void IMU_SPI_Init() {
     gpio_set_dir(PIN_RST, GPIO_OUT);
     gpio_put(PIN_RST, 1);
 
-    /* Set LED on */
     gpio_init(PIN_LED);
     gpio_set_dir(PIN_LED, GPIO_OUT);
 
     dma_tx = dma_claim_unused_channel(true);
     dma_rx = dma_claim_unused_channel(true);
 
-    // We set the outbound DMA to transfer from a memory buffer to the SPI
-    // transmit FIFO paced by the SPI TX FIFO DREQ The default is for the read
-    // address to increment every element (in this case 2 bytes - DMA_SIZE_16)
-    // and for the write address to remain unchanged.
+    /* We set the outbound DMA to transfer from a memory buffer to the SPI
+     * transmit FIFO paced by the SPI TX FIFO DREQ The default is for the read
+     * address to increment every element (in this case 2 bytes - DMA_SIZE_16)
+     * and for the write address to remain unchanged. */
     dma_tx_config = dma_channel_get_default_config(dma_tx);
     channel_config_set_transfer_data_size(&dma_tx_config, DMA_SIZE_16);
     channel_config_set_dreq(&dma_tx_config, spi_get_dreq(SPI_PORT, true));
     channel_config_set_read_increment(&dma_tx_config, true);
     channel_config_set_write_increment(&dma_tx_config, false);
 
-    // We set the inbound DMA to transfer from the SPI receive FIFO to a memory
-    // buffer paced by the SPI RX FIFO DREQ We configure the read address to
-    // remain unchanged for each element, but the write address to increment (so
-    // data is written throughout the buffer)
+    /* We set the inbound DMA to transfer from the SPI receive FIFO to a memory
+     * buffer paced by the SPI RX FIFO DREQ We configure the read address to
+     * remain unchanged for each element, but the write address to increment (so
+     * data is written throughout the buffer) */
     dma_rx_config = dma_channel_get_default_config(dma_rx);
     channel_config_set_transfer_data_size(&dma_rx_config, DMA_SIZE_16);
     channel_config_set_dreq(&dma_rx_config, spi_get_dreq(SPI_PORT, false));
     channel_config_set_read_increment(&dma_rx_config, false);
     channel_config_set_write_increment(&dma_rx_config, true);
 
-    // Tell the DMA to raise IRQ line 0 when the channel finishes a block
+    /* Tell the DMA to raise IRQ line 0 when the channel finishes a block */
     dma_channel_set_irq0_enabled(dma_rx, true);
 
-    // Call IMU_Finish_Burst() when DMA IRQ 0 is asserted
+    /* Call IMU_Finish_Burst() when DMA IRQ 0 is asserted */
     irq_set_exclusive_handler(DMA_IRQ_0, IMU_DMA_Finish_Burst);
     irq_set_enabled(DMA_IRQ_0, true);
 }
@@ -139,12 +138,12 @@ void IMU_Burst_Read_Blocking(uint16_t *buf) {
     SPI_Deselect();
 }
 
-
 void IMU_Reset() {
-  gpio_put(PIN_RST, 0);  // Active low
-  sleep_ms(10);
-  gpio_put(PIN_RST, 1);  // Active low
-  sleep_ms(310);
+    /* Reset pin is active low */
+    gpio_put(PIN_RST, 0);
+    sleep_ms(10);
+    gpio_put(PIN_RST, 1);
+    sleep_ms(310);
 }
 
 /* Start DMA channels to begin transferring memory from the IMU to buffers */
@@ -152,15 +151,15 @@ void IMU_DMA_Burst_Read(uint16_t *buf) {
     SPI_Select();
 
     dma_channel_configure(dma_tx, &dma_tx_config,
-                          &spi_get_hw(SPI_PORT)->dr,  // write address
-                          &imu_write_buf,             // read address
-                          BURST_LEN,                  // half-words to transfer
-                          false);                     // don't start yet
+                          &spi_get_hw(SPI_PORT)->dr,  /* write address */
+                          &imu_write_buf,             /* read address */
+                          BURST_LEN,                  /* half-words to transfer */
+                          false);                     /* don't start yet */
     dma_channel_configure(dma_rx, &dma_rx_config,
-                          &buf,                       // write address
-                          &spi_get_hw(SPI_PORT)->dr,  // read address
-                          BURST_LEN,                  // half-words to transfer
-                          false);                     // don't start yet
+                          &buf,                       /* write address */
+                          &spi_get_hw(SPI_PORT)->dr,  /* read address */
+                          BURST_LEN,                  /* half-words to transfer */
+                          false);                     /* don't start yet */
 
     /* Start both channels */
     dma_start_channel_mask((1u << dma_tx) | (1u << dma_rx));
