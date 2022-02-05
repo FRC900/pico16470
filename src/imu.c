@@ -3,6 +3,7 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "imu.h"
+#include "main.h"
 
 /* Which SPI instance to use */
 #define SPI_PORT spi0
@@ -170,11 +171,11 @@ void IMU_DMA_Finish_Burst() {
 
     /* Clear the interrupt */
     dma_hw->ints0 = 1u << dma_rx;
+
+    g_burst_finished = true;
 }
 
-void IMU_DMA_Burst_Wait() {
-    dma_channel_wait_for_finish_blocking(dma_rx);
-    if (dma_channel_is_busy(dma_tx)) {
-        panic("RX completed before TX");
-    }
+inline void IMU_Hook_DR(void *callback) {
+    /* Set interrupt request on GPIO pin for DR */
+    gpio_set_irq_enabled_with_callback(PIN_DR, IRQ_LEVEL, 1, callback);
 }

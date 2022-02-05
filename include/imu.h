@@ -11,5 +11,6 @@ void IMU_Burst_Read_Blocking(uint16_t *buf);
 void IMU_Reset();
 
 void IMU_DMA_Burst_Read(uint16_t *buf);
-void IMU_DMA_Burst_Wait();
+void IMU_Hook_DR(void *callback);
+
 #endif // IMU_H_

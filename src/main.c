@@ -6,6 +6,7 @@
 #include "hardware/timer.h"
 #include "hardware/spi.h"
 #include "imu.h"
+#include "main.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -21,6 +22,19 @@
 #define SELF_TEST  1u << 2
 
 static uint16_t buf[11] = {0};
+volatile bool g_burst_finished;
+
+void data_ready(uint gpio, uint32_t events) {
+    IMU_DMA_Burst_Read(buf);
+
+    while (!g_burst_finished) {}
+    g_burst_finished = false;
+
+    for (int i = 0; i < 11; i++) {
+        printf("0x%04x ", buf[i]);
+    }
+    puts("\r\n");
+}
 
 int main()
 {
@@ -68,14 +82,10 @@ int main()
 
     sleep_us(200);
 
+    IMU_Hook_DR(&data_ready);
+
     while (true) {
-        /* TODO: Only start burst reads after DR signal */
-        IMU_DMA_Burst_Read(buf);
-        IMU_DMA_Burst_Wait();
-        for (int i = 0; i < 11; i++) {
-            printf("0x%04x ", buf[i]);
-        }
-        puts("\r\n");
-        sleep_ms(1000);
+        /* Do nothing */
+        tight_loop_contents();
     }
 }
