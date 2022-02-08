@@ -3,7 +3,6 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "imu.h"
-#include "main.h"
 
 /* Which SPI instance to use */
 #define SPI_PORT spi0
@@ -153,11 +152,11 @@ void IMU_DMA_Burst_Read(uint16_t *buf) {
 
     dma_channel_configure(dma_tx, &dma_tx_config,
                           &spi_get_hw(SPI_PORT)->dr,  /* write address */
-                          &imu_write_buf,             /* read address */
+                          imu_write_buf,              /* read address */
                           BURST_LEN,                  /* half-words to transfer */
                           false);                     /* don't start yet */
     dma_channel_configure(dma_rx, &dma_rx_config,
-                          &buf,                       /* write address */
+                          buf,                        /* write address */
                           &spi_get_hw(SPI_PORT)->dr,  /* read address */
                           BURST_LEN,                  /* half-words to transfer */
                           false);                     /* don't start yet */
@@ -171,8 +170,13 @@ void IMU_DMA_Finish_Burst() {
 
     /* Clear the interrupt */
     dma_hw->ints0 = 1u << dma_rx;
+}
 
-    g_burst_finished = true;
+void IMU_DMA_Burst_Wait() {
+    dma_channel_wait_for_finish_blocking(dma_rx);
+    if (dma_channel_is_busy(dma_tx)) {
+        panic("RX completed before TX\r\n");
+    }
 }
 
 inline void IMU_Hook_DR(void *callback) {

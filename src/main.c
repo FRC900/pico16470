@@ -1,12 +1,10 @@
 #include <stdio.h>
-#include <inttypes.h>
 #include "pico/stdlib.h"
 #include "hardware/dma.h"
 #include "hardware/pio.h"
 #include "hardware/timer.h"
 #include "hardware/spi.h"
 #include "imu.h"
-#include "main.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -22,14 +20,10 @@
 #define SELF_TEST  1u << 2
 
 static uint16_t buf[11] = {0};
-volatile bool g_burst_finished;
 
 void data_ready(uint gpio, uint32_t events) {
     IMU_DMA_Burst_Read(buf);
-
-    while (!g_burst_finished) {}
-    g_burst_finished = false;
-
+    IMU_DMA_Burst_Wait();
     for (int i = 0; i < 11; i++) {
         printf("0x%04x ", buf[i]);
     }
