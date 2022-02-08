@@ -18,14 +18,14 @@ Linker script and memory map
                 0x0000000020041fcc                literals
 LOAD CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
 START GROUP
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/thumb/v6-m/nofp/libgcc.a
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp/libg.a
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp/libc.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/thumb/v6-m/nofp/libgcc.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/../../../arm-none-eabi/lib/thumb/v6-m/nofp/libg.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/../../../arm-none-eabi/lib/thumb/v6-m/nofp/libc.a
 END GROUP
 START GROUP
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/thumb/v6-m/nofp/libgcc.a
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp/libc.a
-LOAD /usr/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v6-m/nofp/libnosys.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/thumb/v6-m/nofp/libgcc.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/../../../arm-none-eabi/lib/thumb/v6-m/nofp/libc.a
+LOAD /usr/lib/gcc/arm-none-eabi/9.2.1/../../../arm-none-eabi/lib/thumb/v6-m/nofp/libnosys.a
 END GROUP
 OUTPUT(bs2_default.elf elf32-littlearm)
 LOAD linker stubs
@@ -62,8 +62,8 @@ LOAD linker stubs
  .ARM.attributes
                 0x0000000000000000       0x22 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
 
-.debug_line     0x0000000000000000      0x191
- .debug_line    0x0000000000000000      0x191 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
+.debug_line     0x0000000000000000      0x179
+ .debug_line    0x0000000000000000      0x179 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
 
 .debug_info     0x0000000000000000       0x26
  .debug_info    0x0000000000000000       0x26 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
@@ -75,5 +75,5 @@ LOAD linker stubs
  .debug_aranges
                 0x0000000000000000       0x20 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
 
-.debug_str      0x0000000000000000       0x92
- .debug_str     0x0000000000000000       0x92 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj
+.debug_str      0x0000000000000000       0x80
+ .debug_str     0x0000000000000000       0x80 CMakeFiles/bs2_default.dir/compile_time_choice.S.obj

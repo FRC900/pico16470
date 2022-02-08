@@ -10,7 +10,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # Initialise pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
-set(PICO_SDK_PATH "/home/henry/code/pico-sdk")
+set($ENV{PICO_SDK_PATH})
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -24,6 +24,8 @@ pico_sdk_init()
 add_executable(pico16470
         src/main.c
         src/imu.c
+	src/reg.c
+	src/script.c
 )
 
 target_include_directories(
