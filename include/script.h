@@ -45,7 +45,7 @@ typedef struct
 /* Public function prototypes */
 void Script_Check_Stream();
 void Script_Parse_Element(const uint8_t* commandBuf, script * scr);
-void Script_Run_Element(script* scr, uint8_t * outBuf, bool isUSB);
+void Script_Run_Element(script* scr, uint8_t * outBuf);
 
 /** Buffer output base address (on page 255) */
 #define BUF_BASE_ADDR			8

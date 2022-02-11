@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "script.h"
+#include "reg.h"
+#include "usb.h"
 
 /* Private function prototypes */
 static uint32_t ParseCommandArgs(const uint8_t* commandBuf, uint32_t* args);
@@ -477,21 +479,6 @@ void Script_Run_Element(script* scr, uint8_t * outBuf)
   */
 static void StreamCmdHandler(script * scr)
 {
-	/* Set/clear stream interrupt enable flag */
-	if(scr->args[0])
-	{
-		if(!(g_regs[CLI_CONFIG_REG] & SD_STREAM_BITM))
-			g_regs[CLI_CONFIG_REG] |= USB_STREAM_BITM;
-		else
-		{
-			g_regs[CLI_CONFIG_REG] |= SD_STREAM_BITM;
-			g_regs[CLI_CONFIG_REG] &= ~(USB_STREAM_BITM);
-		}
-	}
-	else
-	{
-		g_regs[CLI_CONFIG_REG] &= ~USB_STREAM_BITM;
-	}
 }
 
 /**
@@ -504,12 +491,6 @@ static void StreamCmdHandler(script * scr)
   */
 static void FactoryResetHandler()
 {
-	/* Perform factory reset */
-	g_regs[USER_COMMAND_REG] = CMD_FACTORY_RESET;
-	Reg_Process_Command();
-	/* Perform flash update */
-	g_regs[USER_COMMAND_REG] = CMD_FLASH_UPDATE;
-	Reg_Process_Command();
 }
 
 /**
@@ -528,66 +509,6 @@ static void FactoryResetHandler()
   */
 static void ReadHandler(script* scr, uint8_t* outBuf)
 {
-	/* Pointer within write buffer */
-	uint8_t* writeBufPtr;
-
-	/* Register read value */
-	uint16_t readVal;
-
-	/* Buffer byte count */
-	uint32_t count;
-
-	/* Init buffer variables */
-	writeBufPtr = outBuf;
-	count = 0;
-
-	/* Perform read */
-	for(int i = 0; i < scr->args[2]; i++)
-	{
-		for(uint32_t addr = scr->args[0]; addr <= scr->args[1]; addr += 2)
-		{
-			readVal = Reg_Read(addr);
-			UShortToHex(writeBufPtr, readVal);
-			writeBufPtr[4] = g_regs[CLI_CONFIG_REG] >> CLI_DELIM_BITP;
-			writeBufPtr += 5;
-			count += 5;
-			/* Check if transmit needed (not enough space for next loop) */
-			if((STREAM_BUF_SIZE - count) < 6)
-			{
-				/* Check if at last read. If so, insert newline */
-				if((addr == scr->args[1])||(addr == (scr->args[1] - 1)))
-				{
-					/* Move write pointer back one to last delim */
-					writeBufPtr -= 1;
-					/* Add newline */
-					writeBufPtr[0] = '\r';
-					writeBufPtr[1] = '\n';
-					writeBufPtr += 2;
-					/* Only one new char added */
-					count += 1;
-				}
-				USB_Tx_Handler(outBuf, count);
-				USB_Wait_For_Tx_Done(20);
-				/* Reset pointers */
-				writeBufPtr = outBuf;
-				count = 0;
-			}
-		}
-		if(count != 0)
-		{
-			/* Move write pointer back one to last delim */
-			writeBufPtr -= 1;
-			/* Add newline */
-			writeBufPtr[0] = '\r';
-			writeBufPtr[1] = '\n';
-			writeBufPtr += 2;
-			/* Only one new char added */
-			count += 1;
-		}
-	}
-	/* transmit any remainder data */
-	USB_Tx_Handler(outBuf, count);
-	USB_Wait_For_Tx_Done(20);
 }
 
 
@@ -605,12 +526,6 @@ static void ReadHandler(script* scr, uint8_t* outBuf)
   */
 static void WriteHandler(script* scr)
 {
-	/* Mask addr to 7 bits, value to 8 bits */
-	scr->args[0] &= 0x7F;
-	scr->args[1] &= 0xFF;
-
-	/* Perform write */
-	Reg_Write(scr->args[0], scr->args[1]);
 }
 
 /**
@@ -623,72 +538,6 @@ static void WriteHandler(script* scr)
   */
 static void ReadBufHandler()
 {
-	uint8_t *activeBuf;
-	uint8_t *writeBufPtr;
-	uint16_t readVal;
-	uint32_t addr, buf, numBufs, bufLastAddr, count;
-
-	numBufs = g_regs[BUF_CNT_0_REG];
-	bufLastAddr = g_regs[BUF_LEN_REG] + BUF_DATA_BASE_ADDR;
-	count = 0;
-
-	/* Set page to 255 (if not already) */
-	if(Reg_Read(0) != BUF_READ_PAGE)
-	{
-		Reg_Write(0, BUF_READ_PAGE);
-	}
-
-	writeBufPtr = StreamBuf;
-	activeBuf = StreamBuf;
-
-	for(buf = 0; buf < numBufs; buf++)
-	{
-		Reg_Buf_Dequeue_To_Outputs();
-		for(addr = BUF_BASE_ADDR; addr <= bufLastAddr; addr += 2)
-		{
-			readVal = Reg_Read(addr);
-			UShortToHex(writeBufPtr, readVal);
-			writeBufPtr[4] = g_regs[CLI_CONFIG_REG] >> CLI_DELIM_BITP;
-			writeBufPtr += 5;
-			count += 5;
-			if((STREAM_BUF_SIZE - count) < 6)
-			{
-				/* Check if at last read. If so, insert newline */
-				if((addr == bufLastAddr)||(addr == (bufLastAddr - 1)))
-				{
-					/* Move write pointer back one to last delim */
-					writeBufPtr -= 1;
-					/* Add newline */
-					writeBufPtr[0] = '\r';
-					writeBufPtr[1] = '\n';
-					writeBufPtr += 2;
-					/* Only one new char added */
-					count += 1;
-				}
-
-				/* Perform transmit */
-				USB_Tx_Handler(activeBuf, count);
-				count = 0;
-
-				/* Reset pointers (ping/pong for stream) */
-				writeBufPtr = StreamBuf;
-				activeBuf = StreamBuf;
-			}
-		}
-		if(count != 0)
-		{
-			/* Move write pointer back one to last delim */
-			writeBufPtr -= 1;
-			/* Add newline */
-			writeBufPtr[0] = '\r';
-			writeBufPtr[1] = '\n';
-			writeBufPtr += 2;
-			/* Only one new char added */
-			count += 1;
-		}
-	}
-	/* Transmit any residual data */
-	USB_Tx_Handler(activeBuf, count);
 }
 
 /**
@@ -704,21 +553,6 @@ static void ReadBufHandler()
   */
 static void RegAliasReadHandler(uint8_t* outBuf, uint16_t regIndex)
 {
-	/* Get reg value and covert to string */
-	if(regIndex >= (NUM_REG_PAGES * REG_PER_PAGE))
-	{
-		outBuf[0] = 'B';
-		outBuf[1] = 'a';
-		outBuf[2] = 'd';
-		outBuf[3] = ' ';
-	}
-	else
-	{
-		UShortToHex(outBuf, g_regs[regIndex]);
-		outBuf[4] = '\r';
-		outBuf[5] = '\n';
-	}
-	USB_Tx_Handler(outBuf, 6);
 }
 
 /**
@@ -759,11 +593,12 @@ static void AboutHandler(uint8_t* outBuf)
 static void UptimeHandler(uint8_t* outBuf)
 {
 	uint32_t len = 0;
+	absolute_time_t time = get_absolute_time();
 
 	/* Print uptime */
 	len = sprintf((char *) outBuf,
 			"%lums\r\n",
-			HAL_GetTick());
+			to_ms_since_boot(time));
 
 	USB_Tx_Handler(outBuf, len);
 }

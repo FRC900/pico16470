@@ -70,6 +70,7 @@ BUF_READ_PAGE, 0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, /* 0xC0 - 0xC7 
 /** Selected page. Starts on 253 (config page) */
 static volatile uint32_t selected_page = BUF_CONFIG_PAGE;
 
+#if 0
 /**
   * @brief Check if the requested read is a start of a burst
   *
@@ -735,3 +736,5 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 	/* return index for readback after write */
 	return regIndex;
 }
+
+#endif

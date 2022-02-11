@@ -1,4 +1,4 @@
-# Install script for directory: /opt/pico-sdk/src
+# Install script for directory: /home/henry/code/pico-sdk/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -32,11 +32,16 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "TRUE")
 endif()
 
+# Set default install directory permissions.
+if(NOT DEFINED CMAKE_OBJDUMP)
+  set(CMAKE_OBJDUMP "/usr/bin/arm-none-eabi-objdump")
+endif()
+
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/ubuntu/pico16470/pico-sdk/src/common/cmake_install.cmake")
-  include("/home/ubuntu/pico16470/pico-sdk/src/rp2_common/cmake_install.cmake")
-  include("/home/ubuntu/pico16470/pico-sdk/src/rp2040/cmake_install.cmake")
+  include("/home/henry/code/pico16470/pico-sdk/src/common/cmake_install.cmake")
+  include("/home/henry/code/pico16470/pico-sdk/src/rp2_common/cmake_install.cmake")
+  include("/home/henry/code/pico16470/pico-sdk/src/rp2040/cmake_install.cmake")
 
 endif()
 

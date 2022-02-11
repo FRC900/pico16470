@@ -24,8 +24,9 @@ pico_sdk_init()
 add_executable(pico16470
         src/main.c
         src/imu.c
-	src/reg.c
-	src/script.c
+        src/script.c
+        src/reg.c
+        src/usb.c
 )
 
 target_include_directories(

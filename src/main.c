@@ -5,6 +5,7 @@
 #include "hardware/timer.h"
 #include "hardware/spi.h"
 #include "imu.h"
+#include "usb.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -33,7 +34,7 @@ void data_ready(uint gpio, uint32_t events) {
 int main()
 {
     /* Sleep for 15s while user connects to TTY */
-    sleep_ms(1000 * 15);
+    sleep_ms(1000 * 5);
 
     stdio_init_all();
 
@@ -76,10 +77,9 @@ int main()
 
     sleep_us(200);
 
-    IMU_Hook_DR(&data_ready);
+    //IMU_Hook_DR(&data_ready);
 
     while (true) {
-        /* Do nothing */
-        tight_loop_contents();
+        USB_Rx_Handler();
     }
 }

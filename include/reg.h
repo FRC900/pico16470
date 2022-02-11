@@ -13,6 +13,7 @@
 
 /* Header includes require for prototypes */
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Number of registers per page */
 #define REG_PER_PAGE				64
