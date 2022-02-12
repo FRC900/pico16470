@@ -6,6 +6,7 @@
 #include "hardware/spi.h"
 #include "imu.h"
 #include "usb.h"
+#include "timer.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -33,12 +34,13 @@ void data_ready(uint gpio, uint32_t events) {
 
 int main()
 {
-    /* Sleep for 15s while user connects to TTY */
+    /* Sleep for 5s while user connects to TTY */
     sleep_ms(1000 * 5);
 
     stdio_init_all();
 
     IMU_SPI_Init();
+    Timer_Init();
 
     while (true) {
         IMU_Reset();

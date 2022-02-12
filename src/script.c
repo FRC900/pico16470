@@ -9,6 +9,7 @@
 #include "script.h"
 #include "reg.h"
 #include "usb.h"
+#include "timer.h"
 
 /* Private function prototypes */
 static uint32_t ParseCommandArgs(const uint8_t* commandBuf, uint32_t* args);
@@ -509,6 +510,64 @@ static void FactoryResetHandler()
   */
 static void ReadHandler(script* scr, uint8_t* outBuf)
 {
+	/* Pointer within write buffer */
+	uint8_t* writeBufPtr;
+
+	/* Register read value */
+	uint16_t readVal;
+
+	/* Buffer byte count */
+	uint32_t count;
+
+	/* Init buffer variables */
+	writeBufPtr = outBuf;
+	count = 0;
+
+	/* Perform read */
+	for(int i = 0; i < scr->args[2]; i++)
+	{
+		for(uint32_t addr = scr->args[0]; addr <= scr->args[1]; addr += 2)
+		{
+			readVal = Reg_Read(addr);
+			UShortToHex(writeBufPtr, readVal);
+			writeBufPtr[4] = g_regs[CLI_CONFIG_REG] >> CLI_DELIM_BITP;
+			writeBufPtr += 5;
+			count += 5;
+			/* Check if transmit needed (not enough space for next loop) */
+			if((STREAM_BUF_SIZE - count) < 6)
+			{
+				/* Check if at last read. If so, insert newline */
+				if((addr == scr->args[1])||(addr == (scr->args[1] - 1)))
+				{
+					/* Move write pointer back one to last delim */
+					writeBufPtr -= 1;
+					/* Add newline */
+					writeBufPtr[0] = '\r';
+					writeBufPtr[1] = '\n';
+					writeBufPtr += 2;
+					/* Only one new char added */
+					count += 1;
+				}
+				USB_Tx_Handler(outBuf, count);
+				/* Reset pointers */
+				writeBufPtr = outBuf;
+				count = 0;
+			}
+		}
+		if(count != 0)
+		{
+			/* Move write pointer back one to last delim */
+			writeBufPtr -= 1;
+			/* Add newline */
+			writeBufPtr[0] = '\r';
+			writeBufPtr[1] = '\n';
+			writeBufPtr += 2;
+			/* Only one new char added */
+			count += 1;
+		}
+	}
+	/* transmit any remainder data */
+	USB_Tx_Handler(outBuf, count);
 }
 
 
@@ -526,6 +585,12 @@ static void ReadHandler(script* scr, uint8_t* outBuf)
   */
 static void WriteHandler(script* scr)
 {
+	/* Mask addr to 7 bits, value to 8 bits */
+	scr->args[0] &= 0x7F;
+	scr->args[1] &= 0xFF;
+
+	/* Perform write */
+	Reg_Write(scr->args[0], scr->args[1]);
 }
 
 /**
@@ -593,12 +658,12 @@ static void AboutHandler(uint8_t* outBuf)
 static void UptimeHandler(uint8_t* outBuf)
 {
 	uint32_t len = 0;
-	absolute_time_t time = get_absolute_time();
+	uint32_t milliseconds = Timer_Get_Millisecond_Uptime();
 
 	/* Print uptime */
 	len = sprintf((char *) outBuf,
 			"%lums\r\n",
-			to_ms_since_boot(time));
+			milliseconds);
 
 	USB_Tx_Handler(outBuf, len);
 }

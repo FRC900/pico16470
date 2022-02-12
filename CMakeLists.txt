@@ -27,6 +27,7 @@ add_executable(pico16470
         src/script.c
         src/reg.c
         src/usb.c
+        src/timer.c
 )
 
 target_include_directories(
