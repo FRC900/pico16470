@@ -30,9 +30,9 @@ void USB_Rx_Handler()
 	uint32_t numBytes;
 
 	/* Iterate over all available characters */
-	for (int c = getchar_timeout_us(0);
-		 c != PICO_ERROR_TIMEOUT;
-		 c = getchar_timeout_us(0))
+	for (int c = getc(stdin);
+		 c != EOF;
+		 c = getc(stdin))
 	{
 		/* Backspace typed in console */
 		if(c == '\b')
@@ -43,9 +43,7 @@ void USB_Rx_Handler()
 			/* Replace character with space and put cursor on it */
 			if(!(g_regs[CLI_CONFIG_REG] & USB_ECHO_BITM))
 			{
-				putchar_raw('\b');
-				putchar_raw(' ');
-				putchar_raw('\b');
+				USB_Tx_Handler("\b \b", 3);
 			}
 		}
 		/* Carriage return char (end of command) */
@@ -54,7 +52,7 @@ void USB_Rx_Handler()
 			/* Send newline char if CLI echo is enabled */
 			if(!(g_regs[CLI_CONFIG_REG] & USB_ECHO_BITM))
 			{
-				puts("\r\n");
+				USB_Tx_Handler("\r\n", 2);
 			}
 			/* Place a string terminator */
 			CurrentCommand[commandIndex] = 0;
@@ -82,7 +80,7 @@ void USB_Rx_Handler()
 			/* Echo to console */
 			if(!(g_regs[CLI_CONFIG_REG] & USB_ECHO_BITM))
 			{
-				putchar(c);
+				USB_Tx_Handler((uint8_t*)&c, 1);
 			}
 		}
 	}
@@ -106,4 +104,7 @@ void USB_Tx_Handler(const uint8_t* buf, uint32_t count)
 	if(count == 0)
 		return;
 	fwrite(buf, count, 1, stdout);
+
+	/* Put the stdout buffer in a known empty state */
+	fflush(stdout);
 }
