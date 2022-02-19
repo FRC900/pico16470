@@ -7,6 +7,9 @@
 #include "imu.h"
 #include "usb.h"
 #include "timer.h"
+#include "isr.h"
+#include "buffer.h"
+#include "reg.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -21,17 +24,6 @@
 /* Byte to run a sensor self-check when sent to GLOB_CMD */
 #define SELF_TEST  1u << 2
 
-static uint16_t buf[11] = {0};
-
-void data_ready(uint gpio, uint32_t events) {
-    IMU_DMA_Burst_Read(buf);
-    IMU_DMA_Burst_Wait();
-    for (int i = 0; i < 11; i++) {
-        printf("0x%04x ", buf[i]);
-    }
-    puts("\r\n");
-}
-
 int main()
 {
     /* Sleep for 5s while user connects to TTY */
@@ -41,6 +33,7 @@ int main()
 
     IMU_SPI_Init();
     Timer_Init();
+    Buffer_Reset();
 
     while (true) {
         IMU_Reset();
@@ -79,9 +72,21 @@ int main()
 
     sleep_us(200);
 
-    //IMU_Hook_DR(&data_ready);
+    /* Test buffer, ISR, and IMU */
+    g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
+    g_regs[BUF_WRITE_0_REG] = 0x6800;
 
-    while (true) {
-        USB_Rx_Handler();
+    puts("Starting capture\r\n");
+
+    ISR_Start_IMU_Burst();
+    sleep_ms(500);
+
+    puts("Finished capture\r\n");
+
+    uint16_t *element = (uint16_t*) Buffer_Take_Element();
+    /* Add 10 bytes for the timestamp and signature */
+    for (int i = 0; i < (g_regs[BUF_LEN_REG] + 10) / 2; i++) {
+        printf("0x%04x ", element[i]);
     }
+    puts("\r\n");
 }

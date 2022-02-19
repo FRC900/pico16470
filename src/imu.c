@@ -3,32 +3,22 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "imu.h"
+#include "reg.h"
+#include "isr.h"
 
 /* Which SPI instance to use */
 #define SPI_PORT spi0
 
-#define PIN_TX   19
 #define PIN_RX   16
 #define PIN_CS   17
 #define PIN_SCLK 18
-#define PIN_DR   20
+#define PIN_TX   19
 #define PIN_RST  22
-#define PIN_LED  25
 
 /* Microseconds to stall between 16 bit transfers */
 #define STALL_TIME 20
 
-/* Half-words to read from RX during a burst read. One more than the response
- * length because the first read happens while sending the burst read signal */
-#define BURST_LEN 11
-
-/* DR pin goes from low to high when registers are updated */
-#define IRQ_LEVEL GPIO_IRQ_EDGE_RISE
-
 void IMU_DMA_Finish_Burst();
-
-static const uint16_t start_burst_read = 0x6800;
-static const uint16_t imu_write_buf[BURST_LEN] = {start_burst_read, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static dma_channel_config dma_rx_config;
 static uint dma_rx;
@@ -36,12 +26,54 @@ static uint dma_rx;
 static dma_channel_config dma_tx_config;
 static uint dma_tx;
 
-static inline void SPI_Select() {
+static bool dma_done = false;
+
+static inline void spi_select() {
     gpio_put(PIN_CS, 0);
 }
 
-static inline void SPI_Deselect() {
+static inline void spi_deselect() {
     gpio_put(PIN_CS, 1);
+}
+
+static void dma_rx_callback()
+{
+    /* Clear the interrupt */
+    dma_hw->ints0 = 1u << dma_rx;
+
+    /* Clear interrupt enable */
+    irq_clear(DMA_IRQ_0);
+
+    /* Check if both interrupts complete */
+    if(dma_done == 0)
+    {
+        dma_done = 1;
+    }
+    else
+    {
+        /* Both are done */
+        IMU_DMA_Finish_Burst();
+    }
+}
+
+static void dma_tx_callback()
+{
+    /* Clear the interrupt */
+    dma_hw->ints1 = 1u << dma_tx;
+
+    /* Clear interrupt enable */
+    irq_clear(DMA_IRQ_1);
+
+    /* Check if both interrupts complete */
+    if(dma_done == 0)
+    {
+        dma_done = 1;
+    }
+    else
+    {
+        /* Both are done */
+        IMU_DMA_Finish_Burst();
+    }
 }
 
 void IMU_SPI_Init() {
@@ -61,9 +93,6 @@ void IMU_SPI_Init() {
     gpio_init(PIN_RST);
     gpio_set_dir(PIN_RST, GPIO_OUT);
     gpio_put(PIN_RST, 1);
-
-    gpio_init(PIN_LED);
-    gpio_set_dir(PIN_LED, GPIO_OUT);
 
     dma_tx = dma_claim_unused_channel(true);
     dma_rx = dma_claim_unused_channel(true);
@@ -90,24 +119,30 @@ void IMU_SPI_Init() {
 
     /* Tell the DMA to raise IRQ line 0 when the channel finishes a block */
     dma_channel_set_irq0_enabled(dma_rx, true);
-
-    /* Call IMU_Finish_Burst() when DMA IRQ 0 is asserted */
-    irq_set_exclusive_handler(DMA_IRQ_0, IMU_DMA_Finish_Burst);
+    /* Call dma_rx_callback when DMA IRQ 0 is asserted */
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_rx_callback);
     irq_set_enabled(DMA_IRQ_0, true);
+
+    /* Tell the DMA to raise IRQ line 1 when the channel finishes a block */
+    dma_channel_set_irq1_enabled(dma_tx, true);
+    /* Call dma_tx_callback when DMA IRQ 1 is asserted */
+    irq_set_exclusive_handler(DMA_IRQ_1, dma_tx_callback);
+    irq_set_enabled(DMA_IRQ_1, true);
+
 }
 
 uint16_t IMU_SPI_Transfer(uint16_t msg) {
     uint16_t res = 0;
 
-    SPI_Select();
+    spi_select();
     spi_write16_blocking(SPI_PORT, &msg, 1);
-    SPI_Deselect();
+    spi_deselect();
 
     sleep_us(STALL_TIME);
 
-    SPI_Select();
+    spi_select();
     spi_read16_blocking(SPI_PORT, 0, &res, 1);
-    SPI_Deselect();
+    spi_deselect();
 
     sleep_us(STALL_TIME);
 
@@ -131,13 +166,6 @@ uint16_t IMU_Write_Register(uint8_t RegAddr, uint8_t RegValue) {
     return IMU_SPI_Transfer(msg);
 }
 
-void IMU_Burst_Read_Blocking(uint16_t *buf) {
-    SPI_Select();
-    spi_write16_blocking(SPI_PORT, &start_burst_read, 1);
-    spi_read16_blocking(SPI_PORT, 0x00, buf, BURST_LEN);
-    SPI_Deselect();
-}
-
 void IMU_Reset() {
     /* Reset pin is active low */
     gpio_put(PIN_RST, 0);
@@ -147,39 +175,27 @@ void IMU_Reset() {
 }
 
 /* Start DMA channels to begin transferring memory from the IMU to buffers */
-void IMU_DMA_Burst_Read(uint16_t *buf) {
-    SPI_Select();
+void IMU_DMA_Start_Burst(uint8_t *buf) {
+    spi_select();
 
     dma_channel_configure(dma_tx, &dma_tx_config,
-                          &spi_get_hw(SPI_PORT)->dr,  /* write address */
-                          imu_write_buf,              /* read address */
-                          BURST_LEN,                  /* half-words to transfer */
-                          false);                     /* don't start yet */
+                          &spi_get_hw(SPI_PORT)->dr, /* write address */
+                          &g_regs[BUF_WRITE_0_REG],  /* read address */
+                          g_regs[BUF_LEN_REG] / 2,   /* 16 bit words to transfer */
+                          false);                    /* don't start yet */
     dma_channel_configure(dma_rx, &dma_rx_config,
-                          buf,                        /* write address */
-                          &spi_get_hw(SPI_PORT)->dr,  /* read address */
-                          BURST_LEN,                  /* half-words to transfer */
-                          false);                     /* don't start yet */
+                          buf,                       /* write address */
+                          &spi_get_hw(SPI_PORT)->dr, /* read address */
+                          g_regs[BUF_LEN_REG] / 2,   /* 16 bit words to transfer */
+                          false);                    /* don't start yet */
 
     /* Start both channels */
     dma_start_channel_mask((1u << dma_tx) | (1u << dma_rx));
 }
 
+/* Cleanup after DMA */
 void IMU_DMA_Finish_Burst() {
-    SPI_Deselect();
-
-    /* Clear the interrupt */
-    dma_hw->ints0 = 1u << dma_rx;
-}
-
-void IMU_DMA_Burst_Wait() {
-    dma_channel_wait_for_finish_blocking(dma_rx);
-    if (dma_channel_is_busy(dma_tx)) {
-        panic("RX completed before TX\r\n");
-    }
-}
-
-inline void IMU_Hook_DR(void *callback) {
-    /* Set interrupt request on GPIO pin for DR */
-    gpio_set_irq_enabled_with_callback(PIN_DR, IRQ_LEVEL, 1, callback);
+    spi_deselect();
+    dma_done = false;
+    ISR_Finish_IMU_Burst();
 }

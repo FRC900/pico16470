@@ -95,7 +95,7 @@
 /* Register (non-zero) default values */
 #define FW_REV_DEFAULT				0x0115
 #define BUF_CONFIG_DEFAULT			0x0000
-#define BUF_LEN_DEFAULT				0x0014
+#define BUF_LEN_DEFAULT			0x0016
 #define DIO_INPUT_CONFIG_DEFAULT	0x0011
 #define DIO_OUTPUT_CONFIG_DEFAULT	0x8421
 #define WATER_INT_CONFIG_DEFAULT	0x0020
