@@ -146,22 +146,11 @@ void Script_Check_Stream()
 		watermarkLevel = 1;
 
 	/* Check water mark interrupt status */
-	if(g_regs[BUF_CNT_0_REG] >= watermarkLevel)
+	if(g_regs[BUF_CNT_0_REG] >= watermarkLevel &&
+	   g_regs[CLI_CONFIG_REG] & USB_STREAM_BITM)
 	{
-		/* If SD stream then handle */
-		if(g_regs[CLI_CONFIG_REG] & SD_STREAM_BITM)
-		{
-			/* Ensure USB stream is cleared */
-			g_regs[CLI_CONFIG_REG] &= ~(USB_STREAM_BITM);
-			/* Call handler */
-			ReadBufHandler(false);
-		}
-		/* If USB stream then handle */
-		if(g_regs[CLI_CONFIG_REG] & USB_STREAM_BITM)
-		{
-			/* Call handler */
-			ReadBufHandler(true);
-		}
+		/* Call handler */
+		ReadBufHandler(true);
 	}
 }		
 
@@ -480,6 +469,15 @@ void Script_Run_Element(script* scr, uint8_t * outBuf)
   */
 static void StreamCmdHandler(script * scr)
 {
+	/* Set/clear stream interrupt enable flag */
+	if(scr->args[0])
+	{
+		g_regs[CLI_CONFIG_REG] |= USB_STREAM_BITM;
+	}
+	else
+	{
+		g_regs[CLI_CONFIG_REG] &= ~USB_STREAM_BITM;
+	}
 }
 
 /**
@@ -603,6 +601,65 @@ static void WriteHandler(script* scr)
   */
 static void ReadBufHandler()
 {
+	uint8_t *writeBufPtr = StreamBuf;
+	uint16_t readVal;
+	uint32_t addr, buf, numBufs, bufLastAddr, count;
+
+	numBufs = g_regs[BUF_CNT_0_REG];
+	bufLastAddr = g_regs[BUF_LEN_REG] + BUF_DATA_BASE_ADDR;
+	count = 0;
+
+	/* Set page to 255 (if not already) */
+	if(Reg_Read(0) != BUF_READ_PAGE)
+	{
+		Reg_Write(0, BUF_READ_PAGE);
+	}
+
+	for(buf = 0; buf < numBufs; buf++)
+	{
+		Reg_Buf_Dequeue_To_Outputs();
+		for(addr = BUF_BASE_ADDR; addr <= bufLastAddr; addr += 2)
+		{
+			readVal = Reg_Read(addr);
+			UShortToHex(writeBufPtr, readVal);
+			writeBufPtr[4] = g_regs[CLI_CONFIG_REG] >> CLI_DELIM_BITP;
+			writeBufPtr += 5;
+			count += 5;
+			if((STREAM_BUF_SIZE - count) < 6)
+			{
+				/* Check if at last read. If so, insert newline */
+				if((addr == bufLastAddr)||(addr == (bufLastAddr - 1)))
+				{
+					/* Move write pointer back one to last delim */
+					writeBufPtr -= 1;
+					/* Add newline */
+					writeBufPtr[0] = '\r';
+					writeBufPtr[1] = '\n';
+					writeBufPtr += 2;
+					/* Only one new char added */
+					count += 1;
+				}
+
+				/* Perform transmit */
+				USB_Tx_Handler(StreamBuf, count);
+				count = 0;
+				writeBufPtr = StreamBuf;
+			}
+		}
+		if(count != 0)
+		{
+			/* Move write pointer back one to last delim */
+			writeBufPtr -= 1;
+			/* Add newline */
+			writeBufPtr[0] = '\r';
+			writeBufPtr[1] = '\n';
+			writeBufPtr += 2;
+			/* Only one new char added */
+			count += 1;
+		}
+	}
+	/* Transmit any residual data */
+	USB_Tx_Handler(StreamBuf, count);
 }
 
 /**

@@ -10,6 +10,8 @@
 #include "isr.h"
 #include "buffer.h"
 #include "reg.h"
+#include "data_capture.h"
+#include "script.h"
 
 #define FIRM_REV   0x6C
 #define FIRM_DM    0x6E
@@ -76,17 +78,13 @@ int main()
     g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
     g_regs[BUF_WRITE_0_REG] = 0x6800;
 
-    puts("Starting capture\r\n");
+    Data_Capture_Enable();
 
-    ISR_Start_IMU_Burst();
-    sleep_ms(500);
-
-    puts("Finished capture\r\n");
-
-    uint16_t *element = (uint16_t*) Buffer_Take_Element();
-    /* Add 10 bytes for the timestamp and signature */
-    for (int i = 0; i < (g_regs[BUF_LEN_REG] + 10) / 2; i++) {
-        printf("0x%04x ", element[i]);
+    while (true) {
+        USB_Rx_Handler();
+        Script_Check_Stream();
     }
-    puts("\r\n");
+}
+
+
 }

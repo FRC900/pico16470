@@ -1,6 +1,7 @@
 #include "reg.h"
 #include "imu.h"
 #include "timer.h"
+#include "buffer.h"
 
 /* Local function prototypes */
 static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue);
@@ -73,6 +74,30 @@ BUF_READ_PAGE, 0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, /* 0xC0 - 0xC7 
 static volatile uint32_t selected_page = BUF_CONFIG_PAGE;
 
 /**
+  * @brief Dequeues an entry from the buffer and loads it to the primary output registers
+  *
+  * @return void
+  *
+  * This function is called from the main loop to preserve SPI responsiveness while
+  * a buffer entry is being dequeued into the output registers. This allows a user to read
+  * the buffer contents while the values are being moved (if they start reading at buffer
+  * entry 0). After moving all values to the correct location in the output register array,
+  * the function sets up the burst read DMA (if enabled in user SPI config).
+  */
+void Reg_Buf_Dequeue_To_Outputs()
+{
+	/* Check if buf count > 0) */
+	if(g_regs[BUF_CNT_0_REG] > 0)
+	{
+		g_CurrentBufEntry = (uint16_t *) Buffer_Take_Element();
+	}
+	else
+	{
+		g_CurrentBufEntry = 0;
+	}
+}
+
+/**
   * @brief Process a register read request (from master)
   *
   * @param regAddr The byte address of the register to read
@@ -103,14 +128,23 @@ uint16_t Reg_Read(uint8_t regAddr)
 		/* Handler buffer retrieve case by setting deferred processing flag */
 		if(regIndex == BUF_RETRIEVE_REG)
 		{
-			/* TODO: Implement buffer */
+			/* Set update flag for main loop */
+			g_update_flags |= DEQUEUE_BUF_FLAG;
+
+			/* Return 0 */
 			return 0;
 		}
 
 		if(regIndex > BUF_RETRIEVE_REG)
 		{
-			/* TODO: Implement buffer */
-			return 0;
+			if(g_CurrentBufEntry && (regIndex < g_bufLastRegIndex))
+			{
+				return g_CurrentBufEntry[regIndex - BUF_UTC_TIMESTAMP_REG];
+			}
+			else
+			{
+				return 0;
+			}
 		}
 
 		/* Clear status upon read */
@@ -284,7 +318,8 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 		{
 			if(regValue == 0)
 			{
-				/* TODO: Clear buffer for writes of 0 to count */
+				/* Clear buffer for writes of 0 to count */
+				Buffer_Reset();
 				return regIndex;
 			}
 			else
@@ -333,7 +368,8 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 	{
 		if(isUpper)
 		{
-			/* TODO: Reset the buffer after writing upper half of register (applies new settings) */
+			/* Reset the buffer after writing upper half of register (applies new settings) */
+			Buffer_Reset();
 		}
 	}
 

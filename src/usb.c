@@ -30,9 +30,9 @@ void USB_Rx_Handler()
 	uint32_t numBytes;
 
 	/* Iterate over all available characters */
-	for (int c = getc(stdin);
-		 c != EOF;
-		 c = getc(stdin))
+	for (int c = getchar_timeout_us(0);
+		 c != PICO_ERROR_TIMEOUT;
+		 c = getchar_timeout_us(0))
 	{
 		/* Backspace typed in console */
 		if(c == '\b')
@@ -60,7 +60,6 @@ void USB_Rx_Handler()
 			Script_Parse_Element(CurrentCommand, &scr);
 			/* Execute command */
 			Script_Run_Element(&scr, OutputBuffer);
-			//printf("Parse command: %s\r\n", CurrentCommand);
 
 			/* Clear command buffer */
 			for(int i = 0; i < sizeof(CurrentCommand); i++) {
