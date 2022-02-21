@@ -270,6 +270,10 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 				g_update_flags |= IMU_SPI_CONFIG_FLAG;
 			}
 		}
+		else if(regIndex == USER_SPI_CONFIG_REG)
+		{
+			/* No updating needed, we don't provide user SPI */
+		}
 		else if(regIndex == DIO_OUTPUT_CONFIG_REG)
 		{
 			if(isUpper)
@@ -280,11 +284,8 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 		}
 		else if(regIndex == DIO_INPUT_CONFIG_REG)
 		{
-			if(isUpper)
-			{
-				/* Need to set a flag to update DIO input config */
-				g_update_flags |= DIO_INPUT_CONFIG_FLAG;
-			}
+			/* No updating needed, we only use the DR_POLARITY register
+			 * and both 0 and 1 are valid values */
 		}
 		else if(regIndex == USER_COMMAND_REG)
 		{

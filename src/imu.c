@@ -15,8 +15,8 @@
 #define PIN_TX   19
 #define PIN_RST  22
 
-/* Microseconds to stall between 16 bit transfers */
-#define STALL_TIME 20
+/* Microseconds to stall after chip select. Seems like it should be 16 */
+static uint32_t stall_time = 20;
 
 void IMU_DMA_Finish_Burst();
 
@@ -138,13 +138,13 @@ uint16_t IMU_SPI_Transfer(uint16_t msg) {
     spi_write16_blocking(SPI_PORT, &msg, 1);
     spi_deselect();
 
-    sleep_us(STALL_TIME);
+    sleep_us(stall_time);
 
     spi_select();
     spi_read16_blocking(SPI_PORT, 0, &res, 1);
     spi_deselect();
 
-    sleep_us(STALL_TIME);
+    sleep_us(stall_time);
 
     return res;
 }
@@ -157,7 +157,6 @@ uint16_t IMU_Read_Register(uint8_t RegAddr) {
     return IMU_SPI_Transfer(msg);
 }
 
-/* NOTE: each register has 2 bytes that need to be written to */
 uint16_t IMU_Write_Register(uint8_t RegAddr, uint8_t RegValue) {
     /* Write a 1 to the R/W bit, the address to the next seven bits,
      * and the new value to the last 8 bits */

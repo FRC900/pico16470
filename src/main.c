@@ -26,6 +26,16 @@
 /* Byte to run a sensor self-check when sent to GLOB_CMD */
 #define SELF_TEST  1u << 2
 
+#define STATE_CHECK_FLAGS  0
+#define STATE_CHECK_PPS    1
+#define STATE_READ_ADC     2
+#define STATE_CHECK_USB    3
+#define STATE_CHECK_STREAM 4
+#define STATE_STEP_SCRIPT  5
+
+/** Track the cyclic executive state */
+static uint32_t state;
+
 int main()
 {
     /* Sleep for 5s while user connects to TTY */
@@ -75,16 +85,82 @@ int main()
     sleep_us(200);
 
     /* Test buffer, ISR, and IMU */
-    g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
-    g_regs[BUF_WRITE_0_REG] = 0x6800;
-
-    Data_Capture_Enable();
+    // g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
+    // g_regs[BUF_WRITE_0_REG] = 0x6800;
 
     while (true) {
-        USB_Rx_Handler();
-        Script_Check_Stream();
+        /* Process buf dequeue every loop iteration (high priority) */
+        if(g_update_flags & DEQUEUE_BUF_FLAG)
+        {
+            g_update_flags &= ~DEQUEUE_BUF_FLAG;
+            Reg_Buf_Dequeue_To_Outputs();
+        }
+
+        /* TODO: Set up watchdog and feed here */
+
+        switch(state)
+        {
+        case STATE_CHECK_FLAGS:
+            /* Handle capture disable */
+            if(g_update_flags & DISABLE_CAPTURE_FLAG)
+                {
+                    g_update_flags &= ~DISABLE_CAPTURE_FLAG;
+                    /* Make sure both can't be set */
+                    g_update_flags &= ~(ENABLE_CAPTURE_FLAG);
+                    Data_Capture_Disable();
+                }
+            /* Handle capture enable */
+            else if(g_update_flags & ENABLE_CAPTURE_FLAG)
+                {
+                    g_update_flags &= ~ENABLE_CAPTURE_FLAG;
+                    Data_Capture_Enable();
+                }
+            /* Handle user commands */
+            else if(g_update_flags & USER_COMMAND_FLAG)
+                {
+                    g_update_flags &= ~USER_COMMAND_FLAG;
+                    /* TODO: Determine if user commands are necessary */
+                }
+            /* Handle capture DIO output config change */
+            else if(g_update_flags & DIO_OUTPUT_CONFIG_FLAG)
+                {
+                    g_update_flags &= ~DIO_OUTPUT_CONFIG_FLAG;
+                    /* TODO: Determine if output interrupts are necessary */
+                }
+            /* Handle change to IMU SPI config */
+            else if(g_update_flags & IMU_SPI_CONFIG_FLAG)
+                {
+                    g_update_flags &= ~IMU_SPI_CONFIG_FLAG;
+                    /* TODO: Determine if updating SPI timing is necessary */
+                }
+            /* Advance to next state */
+            state = STATE_CHECK_PPS;
+            break;
+        case STATE_CHECK_PPS:
+            /* Check that PPS isn't unlocked */
+            /* TODO: Determine if PPS is necessary */
+            /* Advance to next state */
+            state = STATE_READ_ADC;
+            break;
+        case STATE_READ_ADC:
+            /* Update ADC state machine */
+            /* TODO: Determine if temperature monitoring is necessary */
+            /* Advance to next state */
+            state = STATE_CHECK_USB;
+            break;
+        case STATE_CHECK_USB:
+            /* Handle any USB command line Rx activity */
+            USB_Rx_Handler();
+            /* Advance to next state */
+            state = STATE_CHECK_STREAM;
+            break;
+        case STATE_CHECK_STREAM:
+            /* Check stream status for CLI */
+            Script_Check_Stream();
+        default:
+            /* Go back to first state */
+            state = STATE_CHECK_FLAGS;
+            break;
+        }
     }
-}
-
-
 }

@@ -30,6 +30,7 @@ add_executable(pico16470
         src/timer.c
         src/buffer.c
         src/isr.c
+        src/data_capture.c
 )
 
 target_include_directories(
