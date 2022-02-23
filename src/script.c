@@ -1,9 +1,3 @@
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "script.h"
@@ -490,6 +484,7 @@ static void StreamCmdHandler(script * scr)
   */
 static void FactoryResetHandler()
 {
+	/* TODO: Implement or remove */
 }
 
 /**
@@ -675,6 +670,21 @@ static void ReadBufHandler()
   */
 static void RegAliasReadHandler(uint8_t* outBuf, uint16_t regIndex)
 {
+	/* Get reg value and convert to string */
+	if(regIndex >= (NUM_REG_PAGES * REG_PER_PAGE))
+	{
+		outBuf[0] = 'B';
+		outBuf[1] = 'a';
+		outBuf[2] = 'd';
+		outBuf[3] = ' ';
+	}
+	else
+	{
+		UShortToHex(outBuf, g_regs[regIndex]);
+		outBuf[4] = '\r';
+		outBuf[5] = '\n';
+	}
+	USB_Tx_Handler(outBuf, 6);
 }
 
 /**
