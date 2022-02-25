@@ -3,11 +3,6 @@
 #include "timer.h"
 #include "isr.h"
 
-#define PIN_PPS 20
-
-/* Private function prototypes */
-static void ConfigurePPSPins(uint32_t enable);
-
 /* Pico timer doesn't support resets, so we subtract this timestamp */
 static absolute_time_t Last_Reset;
 
@@ -31,10 +26,6 @@ void Timer_Init()
 {
 	/* Last reset was at 0 us */
 	update_us_since_boot(&Last_Reset, 0);
-
-	/* Init PPS pin */
-    gpio_init(PIN_PPS);
-    gpio_set_dir(PIN_PPS, GPIO_IN);
 }
 
 /**
@@ -79,6 +70,23 @@ void Timer_Clear_Microsecond_Timer()
 }
 
 /**
+  * @brief Check if the PPS signal is unlocked (greater than 1100ms since last PPS strobe)
+  *
+  * @return void
+  *
+  * This function should be periodically called as part of the firmware housekeeping process
+ **/
+void Timer_Check_PPS_Unlock()
+{
+	/* If microsecond timestamp is greater than 1,100,000 (1.1 seconds) then unlock has occurred */
+	if(Timer_Get_Microsecond_Timestamp() > 1100000)
+	{
+		g_regs[STATUS_0_REG] |= STATUS_PPS_UNLOCK;
+		g_regs[STATUS_1_REG] = g_regs[STATUS_0_REG];
+	}
+}
+
+/**
   * @brief Increment PPS timestamp by 1
   *
   * @return void
@@ -89,8 +97,6 @@ void Timer_Clear_Microsecond_Timer()
   */
 void Timer_Increment_PPS_Time()
 {
-	printf("Increment PPS Time\r\n");
-
 	uint32_t internalTime, startTime;
 
 	/* Increment tick count and check if one second has passed */
@@ -119,71 +125,4 @@ void Timer_Increment_PPS_Time()
 			g_regs[STATUS_1_REG] = g_regs[STATUS_0_REG];
 		}
 	}
-}
-
-/**
-  * @brief Enable PPS timer functionality
-  *
-  * @return void
-  */
-void Timer_Enable_PPS()
-{
-	ConfigurePPSPins(1);
-}
-
-/**
-  * @brief Disable PPS timer functionality
-  *
-  * @return void
-  */
-void Timer_Disable_PPS()
-{
-	ConfigurePPSPins(0);
-}
-
-/**
-  * @brief Configure PPS timer based on DIO_INPUT_CONFIG value
-  *
-  * @param enable Bool flagging if PPS functionality is being enabled or disabled
-  *
-  * This function sets up the PPS input pin, as well as the expected "PPS" period.
-  */
-static void ConfigurePPSPins(uint32_t enable)
-{
-	/* Get current config value */
-	uint32_t config = g_regs[DIO_INPUT_CONFIG_REG];
-
-	/* Set freq values */
-	switch(config & PPS_FREQ_BITM)
-	{
-	case 0:
-		/* 1Hz sync */
-		PPS_MaxTickCount = 1;
-		break;
-	case 1:
-		/* 1Hz sync */
-		PPS_MaxTickCount = 10;
-		break;
-	case 2:
-		/* 1Hz sync */
-		PPS_MaxTickCount = 100;
-		break;
-	case 3:
-		/* 1Hz sync */
-		PPS_MaxTickCount = 1000;
-		break;
-	default:
-		/* 1Hz sync */
-		PPS_MaxTickCount = 1;
-		break;
-	}
-
-	/* Init tick count to 0 */
-	PPS_TickCount = 0;
-
-	/* Initialize based on polarity.
-	 * 0x04: GPIO_IRQ_EDGE_FALL
-	 * 0x08: GPIO_IRQ_EDGE_RISE */
-	enum gpio_irq_level irq_level = 0x04 << (config & PPS_POLARITY_BITM);
-	gpio_set_irq_enabled_with_callback(PIN_PPS, irq_level, enable, Timer_Increment_PPS_Time);
 }

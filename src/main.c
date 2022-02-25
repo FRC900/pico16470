@@ -45,7 +45,6 @@ int main()
 
     IMU_SPI_Init();
     Timer_Init();
-    Timer_Enable_PPS();
     Buffer_Reset();
 
     while (true) {
@@ -139,7 +138,7 @@ int main()
             break;
         case STATE_CHECK_PPS:
             /* Check that PPS isn't unlocked */
-            /* TODO: Determine if PPS is necessary */
+            Timer_Check_PPS_Unlock();
             /* Advance to next state */
             state = STATE_READ_ADC;
             break;

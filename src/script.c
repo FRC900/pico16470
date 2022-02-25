@@ -14,6 +14,7 @@ static void WriteHandler(script* scr);
 static void StreamCmdHandler(script * scr);
 static void AboutHandler(uint8_t* outBuf);
 static void UptimeHandler(uint8_t* outBuf);
+static void IncrementHandler();
 static void FactoryResetHandler();
 static void UShortToHex(uint8_t* outBuf, uint16_t val);
 static uint32_t HexToUInt(const uint8_t* commandBuf);
@@ -75,6 +76,9 @@ static const uint8_t LoopCmd[] = "loop ";
 
 /** String literal for command run command. Must be followed by a space */
 static const uint8_t CommandCmd[] = "cmd ";
+
+/** String literal for incrementing PPS timer command. */
+static const uint8_t IncrementCmd[] = "inc";
 
 /** Print string for invalid command */
 static const uint8_t InvalidCmdStr[] = "Error: Invalid command! Type help for list of valid commands\r\n";
@@ -300,6 +304,13 @@ void Script_Parse_Element(const uint8_t* commandBuf, script * scr)
 		return;
 	}
 
+	if(StringEquals(commandBuf, IncrementCmd, sizeof(IncrementCmd) - 1))
+	{
+		scr->scrCommand = increment;
+		/* No args */
+		return;
+	}
+
 	if(StringEquals(commandBuf, AboutCmd, sizeof(AboutCmd) - 1))
 	{
 		scr->scrCommand = about;
@@ -442,6 +453,9 @@ void Script_Run_Element(script* scr, uint8_t * outBuf)
 			break;
 		case uptime:
 			UptimeHandler(outBuf);
+			break;
+		case increment:
+			IncrementHandler();
 			break;
 		default:
 			/* Should not get here. Transmit error and return */
@@ -733,6 +747,16 @@ static void UptimeHandler(uint8_t* outBuf)
 			milliseconds);
 
 	USB_Tx_Handler(outBuf, len);
+}
+
+/**
+  * @brief Increment PPS time from CLI
+  *
+  * @return void
+  */
+static inline void IncrementHandler()
+{
+	Timer_Increment_PPS_Time();
 }
 
 /**

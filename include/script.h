@@ -19,6 +19,7 @@ typedef enum
 	cnt,
 	about,
 	uptime,
+	increment,
 	help,
 	sleep,
 	loop,
