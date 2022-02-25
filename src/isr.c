@@ -37,11 +37,8 @@ void ISR_Start_IMU_Burst()
     if(!Buffer_Can_Add_Element())
         return;
 
-    /* Get the sample timestamp. Microseconds will quickly overflow a u32, so
-     * store the time first and then put it into the Us and S stamps. */
-    uint64_t microseconds = Timer_Get_Microsecond_Timestamp();
-    uint32_t SampleTimestampUs = microseconds;
-    uint32_t SampleTimestampS = microseconds / US_IN_S;
+    uint32_t SampleTimestampUs = Timer_Get_Microsecond_Timestamp();
+    uint32_t SampleTimestampS = Timer_Get_PPS_Timestamp();
 
     /* Get element handle */
     BufferElementHandle = Buffer_Add_Element();

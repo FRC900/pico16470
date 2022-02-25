@@ -45,6 +45,7 @@ int main()
 
     IMU_SPI_Init();
     Timer_Init();
+    Timer_Enable_PPS();
     Buffer_Reset();
 
     while (true) {

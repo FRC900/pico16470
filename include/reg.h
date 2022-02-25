@@ -163,8 +163,11 @@
 #define BUF_CFG_MASK				(BUF_CFG_REPLACE_OLDEST|BUF_CFG_IMU_BURST|BUF_CFG_BUF_BURST)
 
 /* DIO_INPUT_CONFIG bit positions */
-#define DR_POLARITY_BITP            7
+#define DR_POLARITY_BITP            4
+#define PPS_POLARITY_BITP           7
 #define DR_POLARITY_BITM            (1 << DR_POLARITY_BITP)
+#define PPS_POLARITY_BITM           (1 << DR_POLARITY_BITP)
+#define PPS_FREQ_BITM               ((1 << 12) | (1 << 13))
 
 /* Watermark int config pulse mode mask */
 #define WATERMARK_PULSE_MASK 		(1 << 15)
