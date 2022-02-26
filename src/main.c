@@ -85,8 +85,13 @@ int main()
     sleep_us(200);
 
     /* Test buffer, ISR, and IMU */
-    // g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
-    // g_regs[BUF_WRITE_0_REG] = 0x6800;
+    /* g_regs[BUF_CONFIG_REG] |= BUF_CFG_IMU_BURST;
+     * (write 0 FD)
+     * (write 2 2)
+     * g_regs[BUF_WRITE_0_REG] = 0x6800;
+     * (write 0 FE)
+     * (write 12 00)
+     * (write 13 68) */
 
     while (true) {
         /* Process buf dequeue every loop iteration (high priority) */

@@ -743,7 +743,7 @@ static void UptimeHandler(uint8_t* outBuf)
 
 	/* Print uptime */
 	len = sprintf((char *) outBuf,
-			"%lums\r\n",
+			"%dms\r\n",
 			milliseconds);
 
 	USB_Tx_Handler(outBuf, len);
