@@ -1,11 +1,11 @@
 #include "isr.h"
+#include "usb.h"
 #include "reg.h"
 #include "imu.h"
 #include "timer.h"
 #include "buffer.h"
-#include <stdio.h>
 
-const uint32_t US_IN_S = 1000 * 1000;
+static const char NoIMUBurstError[] = "Unimplemented: data capture without IMU_BURST enabled \r\n";
 
 /* Track if there is currently a capture in progress */
 volatile uint32_t g_captureInProgress = 0u;
@@ -69,7 +69,11 @@ void ISR_Start_IMU_Burst()
     }
     else
     {
-        /* TODO: Use BUF_WRITE_{0..31} regs to query the IMU for each word individually */
+        /* This mode is for generating your own readout of the IMU instead of a
+         * burst read, by specifying registers to read individually instead of
+         * reading and writing simultaneously. We don't need this now, so it's
+         * not implemented. */
+        USB_Tx_Handler(NoIMUBurstError, sizeof(NoIMUBurstError) - 1);
     }
 }
 
