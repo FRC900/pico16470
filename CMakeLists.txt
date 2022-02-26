@@ -43,12 +43,12 @@ pico_set_program_name(pico16470 "pico16470")
 pico_set_program_version(pico16470 "0.1")
 
 #For not debugging:
-#pico_enable_stdio_uart(pico16470 0)
-#pico_enable_stdio_usb(pico16470 1)
+pico_enable_stdio_uart(pico16470 0)
+pico_enable_stdio_usb(pico16470 1)
 
 #For debugging:
-pico_enable_stdio_uart(pico16470 1)
-pico_enable_stdio_usb(pico16470 0)
+#pico_enable_stdio_uart(pico16470 1)
+#pico_enable_stdio_usb(pico16470 0)
 
 # Add the standard library to the build
 target_link_libraries(pico16470 pico_stdlib)
