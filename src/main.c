@@ -4,6 +4,7 @@
 #include "hardware/pio.h"
 #include "hardware/timer.h"
 #include "hardware/spi.h"
+#include "hardware/watchdog.h"
 #include "imu.h"
 #include "usb.h"
 #include "timer.h"
@@ -44,9 +45,17 @@ int main()
     stdio_init_all();
 
     IMU_SPI_Init();
+    /* TODO: Test if PPS locks */
     Timer_Init();
     Buffer_Reset();
+    Reg_Update_Identifiers();
 
+    if (watchdog_caused_reboot()) {
+        g_regs[STATUS_0_REG] |= STATUS_WATCHDOG;
+        g_regs[STATUS_1_REG] = g_regs[STATUS_0_REG];
+    }
+
+    /* TODO: Port self-test to client */
     while (true) {
         IMU_Reset();
         uint16_t prod_id = IMU_Read_Register(0x72);
@@ -93,6 +102,9 @@ int main()
      * (write 12 00)
      * (write 13 68) */
 
+    /* Enable watchdog timer (2 seconds period) */
+    watchdog_enable(2000, 1);
+
     while (true) {
         /* Process buf dequeue every loop iteration (high priority) */
         if(g_update_flags & DEQUEUE_BUF_FLAG)
@@ -101,7 +113,7 @@ int main()
             Reg_Buf_Dequeue_To_Outputs();
         }
 
-        /* TODO: Set up watchdog and feed here */
+        watchdog_update();
 
         switch(state)
         {
@@ -124,19 +136,7 @@ int main()
             else if(g_update_flags & USER_COMMAND_FLAG)
                 {
                     g_update_flags &= ~USER_COMMAND_FLAG;
-                    /* TODO: Determine if user commands are necessary */
-                }
-            /* Handle capture DIO output config change */
-            else if(g_update_flags & DIO_OUTPUT_CONFIG_FLAG)
-                {
-                    g_update_flags &= ~DIO_OUTPUT_CONFIG_FLAG;
-                    /* TODO: Determine if output interrupts are necessary */
-                }
-            /* Handle change to IMU SPI config */
-            else if(g_update_flags & IMU_SPI_CONFIG_FLAG)
-                {
-                    g_update_flags &= ~IMU_SPI_CONFIG_FLAG;
-                    /* TODO: Determine if updating SPI timing is necessary */
+                    Reg_Process_Command();
                 }
             /* Advance to next state */
             state = STATE_CHECK_PPS;
@@ -144,12 +144,6 @@ int main()
         case STATE_CHECK_PPS:
             /* Check that PPS isn't unlocked */
             Timer_Check_PPS_Unlock();
-            /* Advance to next state */
-            state = STATE_READ_ADC;
-            break;
-        case STATE_READ_ADC:
-            /* Update ADC state machine */
-            /* TODO: Determine if temperature monitoring is necessary */
             /* Advance to next state */
             state = STATE_CHECK_USB;
             break;

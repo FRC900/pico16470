@@ -115,6 +115,8 @@ static const uint8_t HelpStr[] = "\r\n"
 		"   Stops the buffered read stream if <startStop> is zero, otherwise the stream is enabled\r\n"
 		"cnt\r\n"
 		"   Read the number of IMU samples currently stored in the buffer\r\n"
+		"inc\r\n"
+		"   Increments the PPS counter\r\n"
 		"\r\n"
 		"cmd <cmdValue>\r\n"
 		"   Writes the 16-bit <cmdValue> to the iSensor-SPI-Buffer COMMAND register. Does not change the selected register page\r\n"
@@ -498,7 +500,9 @@ static void StreamCmdHandler(script * scr)
   */
 static void FactoryResetHandler()
 {
-	/* TODO: Implement or remove */
+	/* Perform factory reset */
+	g_regs[USER_COMMAND_REG] = CMD_FACTORY_RESET;
+	Reg_Process_Command();
 }
 
 /**

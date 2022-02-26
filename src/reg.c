@@ -1,6 +1,9 @@
+#include "hardware/watchdog.h"
+#include "pico/unique_id.h"
 #include "reg.h"
 #include "imu.h"
 #include "timer.h"
+#include "data_capture.h"
 #include "buffer.h"
 
 /* Local function prototypes */
@@ -378,3 +381,226 @@ static uint16_t ProcessRegWrite(uint8_t regAddr, uint8_t regValue)
 	return regIndex;
 }
 
+/**
+  * @brief Populates the six SN registers automatically
+  *
+  * @return void
+  *
+  * The SN registers are populated from the 96-bit unique ID (UID)
+  */
+static void GetSN()
+{
+#if PICO_UNIQUE_BOARD_ID_SIZE_BYTES > 12
+	uint8_t pico_id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES] = {0};
+#else
+	uint8_t pico_id[12] = {0};
+#endif
+
+	pico_get_unique_board_id((pico_unique_board_id_t *)(pico_id));
+
+	for(uint8_t i = 0; i < 12; i = i + 2)
+	{
+		uint16_t id = *(pico_id + i);
+		id |= (*(pico_id + i + 1)) << 8;
+		g_regs[DEV_SN_REG + (i >> 1)] = id;
+	}
+}
+
+/**
+  * @brief Populates the firmware date registers automatically
+  *
+  * @return void
+  *
+  * Registers are populated by parsing the __DATE__ macro result, which
+  * is set at compile time
+  */
+static void GetBuildDate()
+{
+	uint8_t date[11] = __DATE__;
+
+	uint16_t year;
+	uint8_t day;
+	uint8_t month;
+
+	/* Pre-process date */
+	for(uint32_t i = 3; i<11; i++)
+	{
+		date[i] = date[i] - '0';
+	}
+
+	/* Get year */
+	year = (date[7] << 12) | (date[8] << 8) | (date[9] << 4) | date[10];
+
+	/* Get day */
+	day = (date[4] << 4) | date[5];
+
+	/* Get month */
+	switch(date[0])
+	{
+	case 'J':
+		if(date[1] == 'a' && date[2] == 'n')
+			month = 0x01;
+		else if(date[1] == 'u' && date[2] == 'n')
+			month = 0x06;
+		else
+			month = 0x07;
+		break;
+	case 'F':
+		month = 0x02;
+		break;
+	case 'M':
+		if(date[2] == 'r')
+			month = 0x03;
+		else
+			month = 0x05;
+		break;
+	case 'A':
+		if(date[1] == 'p')
+			month = 0x04;
+		else
+			month = 0x08;
+		break;
+	case 'S':
+		month = 0x09;
+		break;
+	case 'O':
+		month = 0x10;
+		break;
+	case 'N':
+		month = 0x11;
+		break;
+	case 'D':
+		month = 0x12;
+		break;
+	default:
+		/* shouldnt get here */
+		month = 0x00;
+		break;
+	}
+
+	g_regs[FW_DAY_MONTH_REG] = (day << 8) | month;
+	g_regs[FW_YEAR_REG] = year;
+
+	/* Also load FW rev here just in case */
+	g_regs[FW_REV_REG] = FW_REV_DEFAULT;
+
+	/* Set MSB of firmware rev register if compiled under debug mode */
+#ifdef DEBUG
+	g_regs[FW_REV_REG] |= 0x8000;
+#endif
+}
+
+/**
+  * @brief Load SN and date code registers to SRAM
+  *
+  * @return void
+  *
+  * These register values are encoded into the .text section of flash
+  */
+void Reg_Update_Identifiers()
+{
+	/* Load build date from .data to register array */
+	GetBuildDate();
+	/* Load STM32 unique SN to register array */
+	GetSN();
+}
+
+/**
+  * @brief Load factory default values for all registers, and applies any settings changes.
+  *
+  * @return void
+  *
+  * This is accomplished in "lazy" manner via a preprocessor define for each register
+  * default value (defaults are stored in program memory, storage is managed
+  * by compiler). This function only changes values in SRAM, does not change
+  * flash contents (registers will reset on next re-boot).
+  */
+void Reg_Factory_Reset()
+{
+	/* Store endurance count during factory reset */
+	uint16_t endurance, flash_sig, flash_sig_drv;
+
+	/* Disable data capture from IMU (shouldn't be running, but better safe than sorry) */
+	Data_Capture_Disable();
+
+	/* Reset selected page */
+	selected_page = BUF_CONFIG_PAGE;
+
+	/* Save endurance and flash sig */
+	endurance = g_regs[ENDURANCE_REG];
+	flash_sig = g_regs[FLASH_SIG_REG];
+	flash_sig_drv = g_regs[FLASH_SIG_DRV_REG];
+
+	/* Reset all registers to 0 */
+	for(int i = 0; i < (NUM_REG_PAGES * REG_PER_PAGE); i++)
+	{
+		g_regs[i] = 0;
+	}
+
+	/* Restore page number registers (addr 0 on each page) */
+	g_regs[0 * REG_PER_PAGE] = OUTPUT_PAGE;
+	g_regs[1 * REG_PER_PAGE] = BUF_CONFIG_PAGE;
+	g_regs[2 * REG_PER_PAGE] = BUF_WRITE_PAGE;
+	g_regs[3 * REG_PER_PAGE] = BUF_READ_PAGE;
+
+	/* Restore all non-zero default values */
+	g_regs[BUF_CONFIG_REG] = BUF_CONFIG_DEFAULT;
+	g_regs[BUF_LEN_REG] = BUF_LEN_DEFAULT;
+	g_regs[DIO_INPUT_CONFIG_REG] = DIO_INPUT_CONFIG_DEFAULT;
+	g_regs[DIO_OUTPUT_CONFIG_REG] = DIO_OUTPUT_CONFIG_DEFAULT;
+	g_regs[WATERMARK_INT_CONFIG_REG] = WATER_INT_CONFIG_DEFAULT;
+	g_regs[ERROR_INT_CONFIG_REG] = ERROR_INT_CONFIG_DEFAULT;
+	g_regs[IMU_SPI_CONFIG_REG] = IMU_SPI_CONFIG_DEFAULT;
+	g_regs[USER_SPI_CONFIG_REG] = USER_SPI_CONFIG_DEFAULT;
+	g_regs[FW_REV_REG] = FW_REV_DEFAULT;
+	g_regs[CLI_CONFIG_REG] = CLI_CONFIG_DEFAULT;
+	g_regs[BTN_CONFIG_REG] = BTN_CONFIG_DEFAULT;
+	g_regs[SYNC_FREQ_REG] = SYNC_FREQ_DEFAULT;
+
+	/* Apply endurance and flash sig back */
+	g_regs[ENDURANCE_REG] = endurance;
+	g_regs[FLASH_SIG_REG] = flash_sig;
+	g_regs[FLASH_SIG_DRV_REG] = flash_sig_drv;
+
+	/* Populate SN and build date */
+	Reg_Update_Identifiers();
+
+	/* Apply all settings and reset buffer */
+	Buffer_Reset();
+}
+
+/**
+  * @brief Processes a command register write. This function is called from main loop.
+  *
+  * @return void
+  *
+  * Only one command can be executed per write to the USER_COMMAND register.
+  * Command execution priority is determined by the order in which the command
+  * flags are checked.
+  */
+void Reg_Process_Command()
+{
+	uint16_t command = g_regs[USER_COMMAND_REG];
+
+	/* Clear command register */
+	g_regs[USER_COMMAND_REG] = 0;
+
+	if(command & CMD_SOFTWARE_RESET)
+	{
+		/* Enable watchdog to reset after 0ms, rebooting the Pico */
+		watchdog_enable(0, 0);
+		while(1);
+	}
+	else if(command & CMD_CLEAR_BUFFER)
+	{
+		Buffer_Reset();
+	}
+	else if(command & CMD_FACTORY_RESET)
+	{
+		Reg_Factory_Reset();
+	}
+	else if(command & CMD_IMU_RESET)
+	{
+		IMU_Reset();
+	}
+}
