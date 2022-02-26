@@ -97,6 +97,10 @@ void ISR_Finish_IMU_Burst()
     /* Build buffer signature */
     uint16_t *RxData = (uint16_t *) BufferElementHandle;
 
+    for(int reg = 0; reg < (g_regs[BUF_LEN_REG] / 2); reg++)
+    {
+        BufferSignature += RxData[reg];
+    }
     /* Save signature to buffer entry */
     BufferSigHandle[0] = BufferSignature;
 
