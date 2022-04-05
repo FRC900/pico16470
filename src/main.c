@@ -59,7 +59,7 @@ int main()
     while (true) {
         IMU_Reset();
         uint16_t prod_id = IMU_Read_Register(0x72);
-        if (prod_id == 0x4256) {
+        if (prod_id == 0x4079) {
             printf("Got expected PROD_ID: 0x%04x\r\n", prod_id);
             break;
         } else {

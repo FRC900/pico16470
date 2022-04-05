@@ -5,7 +5,7 @@
 #include "hardware/gpio.h"
 #include "data_capture.h"
 
-#define PIN_DR    20
+#define PIN_DR 0
 
 static enum gpio_irq_level irq_level;
 

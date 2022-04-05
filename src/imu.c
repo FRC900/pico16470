@@ -9,11 +9,11 @@
 /* Which SPI instance to use */
 #define SPI_PORT spi0
 
-#define PIN_RX   16
-#define PIN_CS   17
-#define PIN_SCLK 18
-#define PIN_TX   19
-#define PIN_RST  22
+#define PIN_RX   4
+#define PIN_CS   1
+#define PIN_SCLK 2
+#define PIN_TX   3
+#define PIN_RST  6
 
 /* Microseconds to stall after chip select. Seems like it should be 16 */
 static uint32_t stall_time = 20;
