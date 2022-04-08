@@ -39,9 +39,6 @@ static uint32_t state;
 
 int main()
 {
-    /* Sleep for 5s while user connects to TTY */
-    sleep_ms(1000 * 5);
-
     stdio_init_all();
 
     IMU_SPI_Init();
